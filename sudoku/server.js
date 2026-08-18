@@ -4,7 +4,7 @@ const express = require('express');
 const path = require('path');
 
 const app = express();
-const PORT = parseInt(process.env.INGRESS_PORT || process.env.PORT || '8080', 10);
+const PORT = parseInt(process.env.PORT || '8099', 10);
 
 app.use(express.static(path.join(__dirname, 'www')));
 
