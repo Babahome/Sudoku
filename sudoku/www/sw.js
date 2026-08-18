@@ -1,4 +1,4 @@
-const CACHE_NAME = "sudoku-maman-v1";
+const CACHE_NAME = "sudoku-maman-v2";
 const CACHED_URLS = ["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(event){
@@ -19,8 +19,12 @@ self.addEventListener("activate", function(event){
 
 self.addEventListener("fetch", function(event){
   event.respondWith(
-    caches.match(event.request).then(function(cached){
-      return cached || fetch(event.request);
+    fetch(event.request).then(function(response){
+      var copy = response.clone();
+      caches.open(CACHE_NAME).then(function(cache){ cache.put(event.request, copy); });
+      return response;
+    }).catch(function(){
+      return caches.match(event.request);
     })
   );
 });
