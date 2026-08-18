@@ -1,0 +1,13 @@
+name: "Sudoku"
+description: "Jeu de Sudoku simple et agreable a jouer"
+version: "0.1.0"
+slug: "sudoku"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armv7
+ingress: true
+ingress_port: 8080
+panel_icon: mdi:grid
+panel_title: Sudoku

@@ -2,7 +2,7 @@
   "name": "Sudoku Maman",
   "short_name": "Sudoku",
   "description": "Jeu de Sudoku simple et agreable a jouer.",
-  "start_url": "./sudoku-maman.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
