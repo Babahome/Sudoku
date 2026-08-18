@@ -56,27 +56,34 @@
   html,body{
     margin:0;
     padding:0;
+    height:100%;
     background:var(--bg);
     color:var(--ink);
     font-family:"Segoe UI", "Helvetica Neue", Arial, sans-serif;
     -webkit-text-size-adjust:100%;
+    overflow:hidden;
   }
   body{
-    min-height:100vh;
+    height:100vh;
+    height:100dvh;
     display:flex;
     justify-content:center;
-    padding:0 0 40px;
+    padding:0;
   }
   .app{
     width:100%;
     max-width:520px;
-    padding:14px 16px 0;
+    height:100%;
+    padding:10px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+    display:flex;
+    flex-direction:column;
   }
   .topbar{
+    flex:0 0 auto;
     display:flex;
     align-items:center;
     justify-content:space-between;
-    padding:6px 0 18px;
+    padding:4px 0 10px;
   }
   .icon-btn{
     background:none;
@@ -96,8 +103,9 @@
   .icon-btn.star.favorite svg{ fill:var(--accent); stroke:var(--accent); }
 
   .score-row{
+    flex:0 0 auto;
     text-align:center;
-    margin-bottom:10px;
+    margin-bottom:6px;
   }
   .score-row .label{
     font-size:1.3rem;
@@ -106,12 +114,13 @@
   }
 
   .status-row{
+    flex:0 0 auto;
     display:flex;
     align-items:center;
     justify-content:space-between;
     color:var(--ink-soft);
     font-size:1rem;
-    margin-bottom:14px;
+    margin-bottom:8px;
     padding:0 2px;
   }
   .status-row .errors.max{ color:var(--error); font-weight:700; }
@@ -124,13 +133,24 @@
   }
   .status-row .timer-group svg{ width:13px; height:13px; }
 
-  .board-wrap{ position:relative; margin:0 -16px; }
+  .board-wrap{
+    flex:1 1 auto;
+    min-height:0;
+    position:relative;
+    margin:0 -16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
   .board{
     display:grid;
     grid-template-columns:repeat(9,1fr);
     grid-template-rows:repeat(9,1fr);
     width:100%;
     aspect-ratio:1/1;
+    max-width:100%;
+    max-height:100%;
+    flex-shrink:0;
     border:3px solid var(--line-strong);
     border-radius:8px;
     overflow:hidden;
@@ -142,7 +162,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:calc(clamp(1.35rem, 5.4vw, 2.2rem) * var(--font-scale));
+    font-size:clamp(0.9rem, calc(var(--board-size, 480px) / 9 * 0.52 * var(--font-scale)), 2.6rem);
     font-weight:600;
     color:var(--user);
     cursor:pointer;
@@ -178,7 +198,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:clamp(0.62rem, 1.95vw, 0.88rem);
+    font-size:clamp(0.5rem, calc(var(--board-size, 480px) / 9 * 0.177), 0.88rem);
     font-weight:700;
     color:var(--ink-soft);
   }
@@ -200,11 +220,12 @@
   .board-wrap.paused .board-overlay{ display:flex; }
 
   .toggle-row{
+    flex:0 0 auto;
     display:flex;
     align-items:center;
     justify-content:flex-end;
     gap:8px;
-    margin:10px 2px 20px;
+    margin:6px 2px 10px;
   }
   .toggle-row svg{ width:16px; height:16px; color:var(--ink-soft); }
   .switch{
@@ -229,10 +250,11 @@
   .switch.on .knob{ left:20px; }
 
   .actions-row{
+    flex:0 0 auto;
     display:grid;
     grid-template-columns:repeat(5,1fr);
     gap:4px;
-    margin-bottom:20px;
+    margin-bottom:10px;
   }
   .action-btn{
     background:none;
@@ -276,14 +298,9 @@
     padding:1px 6px;
   }
   .action-btn.pencil-on .pill{ background:var(--accent); color:#fff; }
-  .action-btn .lock{
-    position:absolute;
-    bottom:16px; right:10px;
-    width:12px; height:12px;
-    color:var(--ink-soft);
-  }
 
   .keypad{
+    flex:0 0 auto;
     display:grid;
     grid-template-columns:repeat(9,1fr);
     gap:6px;
@@ -307,11 +324,12 @@
   .key:active{ transform:scale(0.96); }
 
   .hint-text{
+    flex:0 0 auto;
     text-align:center;
     color:var(--ink-soft);
-    font-size:0.85rem;
-    margin-top:22px;
-    line-height:1.4;
+    font-size:0.78rem;
+    margin-top:8px;
+    line-height:1.3;
   }
 
   .modal-backdrop{
@@ -432,16 +450,6 @@
     accent-color:var(--accent);
   }
 
-  .dim-overlay{
-    position:fixed;
-    inset:0;
-    background:#000;
-    opacity:0;
-    pointer-events:none;
-    transition:opacity 1.2s ease;
-    z-index:15;
-  }
-  .dim-overlay.dimmed{ opacity:0.55; }
 </style>
 </head>
 <body>
@@ -491,7 +499,6 @@
       </button>
       <button class="action-btn" id="quickPencilBtn">
         <span class="icon" id="quickPencilIcon"></span>
-        <span class="lock" id="lockIcon"></span>
         <span class="label">Crayon rapide</span>
       </button>
       <button class="action-btn" id="pencilBtn">
@@ -519,10 +526,6 @@
         <button class="diff-btn" data-level="moyen">Moyen</button>
         <button class="diff-btn" data-level="difficile">Difficile</button>
       </div>
-      <div class="modal-toggle-row">
-        <span>Baisser la luminosité (réflexion)</span>
-        <button class="switch" id="dimSwitch"><span class="knob"></span></button>
-      </div>
       <div class="modal-slider-row">
         <div class="slider-label">
           <span>Taille des chiffres</span>
@@ -537,7 +540,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <div class="dim-overlay" id="dimOverlay"></div>
 
 <script>
 (function(){
@@ -562,7 +564,6 @@
     undo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>',
     erase:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-9.5 9.5H6l-2-2z"></path><path d="M11.5 6.5l5 5"></path><path d="M6 21h13"></path></svg>',
     pencil:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>',
-    lock:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2"></path></svg>',
     bulb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a6 6 0 0 0-4 10.47c.5.46.9 1.15 1 1.83V16h6v-1.7c.1-.68.5-1.37 1-1.83A6 6 0 0 0 12 2z"></path><line x1="19" y1="5" x2="21" y2="3"></line><line x1="20" y1="9" x2="22.5" y2="9"></line></svg>'
   };
 
@@ -576,7 +577,6 @@
   document.getElementById("undoIcon").innerHTML = ICONS.undo;
   document.getElementById("eraseIcon").innerHTML = ICONS.erase;
   document.getElementById("quickPencilIcon").innerHTML = ICONS.pencil;
-  document.getElementById("lockIcon").innerHTML = ICONS.lock;
   document.getElementById("pencilIcon").innerHTML = ICONS.pencil;
   document.getElementById("hintIcon").innerHTML = ICONS.bulb;
 
@@ -855,6 +855,13 @@
     }
   }
 
+  function sizeBoard(){
+    var size = Math.max(0, Math.min(boardWrapEl.clientWidth, boardWrapEl.clientHeight));
+    boardEl.style.width = size + "px";
+    boardEl.style.height = size + "px";
+    document.documentElement.style.setProperty("--board-size", size + "px");
+  }
+
   function buildKeypadDom(){
     keypadEl.innerHTML = "";
     for (var n=1;n<=9;n++){
@@ -956,6 +963,7 @@
 
     document.getElementById("undoBtn").disabled = !undoStack.length || state.paused;
 
+    updateWakeLock();
     saveState();
   }
 
@@ -1119,46 +1127,32 @@
   function openSettings(){ document.getElementById("settingsModal").classList.add("open"); }
   function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
 
-  // ---------- Screen dimming (temps de reflexion) ----------
+  // ---------- Wake lock (garder l'ecran allume pendant la partie) ----------
 
-  var DIM_DELAY_MS = 15000;
-  var dimEnabled = true;
-  var dimTimeout = null;
-  var dimOverlayEl = document.getElementById("dimOverlay");
-  var dimSwitchEl = document.getElementById("dimSwitch");
+  var wakeLock = null;
 
-  function loadDimPref(){
-    try{
-      var v = localStorage.getItem("sudoku_maman_dim_enabled");
-      if (v !== null) dimEnabled = v === "1";
-    }catch(e){}
+  function requestWakeLock(){
+    if (!("wakeLock" in navigator) || wakeLock) return;
+    navigator.wakeLock.request("screen").then(function(lock){
+      wakeLock = lock;
+      wakeLock.addEventListener("release", function(){ wakeLock = null; });
+    }).catch(function(){ /* wake lock indisponible, on continue sans */ });
   }
 
-  function saveDimPref(){
-    try{ localStorage.setItem("sudoku_maman_dim_enabled", dimEnabled ? "1" : "0"); }catch(e){}
+  function releaseWakeLock(){
+    if (wakeLock){ wakeLock.release().catch(function(){}); wakeLock = null; }
   }
 
-  function setDimmed(on){
-    dimOverlayEl.classList.toggle("dimmed", on);
+  function updateWakeLock(){
+    if (state && !state.paused && !state.locked){
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
   }
 
-  function clearDimTimer(){
-    if (dimTimeout){ clearTimeout(dimTimeout); dimTimeout = null; }
-  }
-
-  function scheduleDim(){
-    clearDimTimer();
-    setDimmed(false);
-    if (!dimEnabled) return;
-    dimTimeout = setTimeout(function(){
-      if (!state || state.paused || state.locked) return;
-      if (document.getElementById("settingsModal").classList.contains("open")) return;
-      setDimmed(true);
-    }, DIM_DELAY_MS);
-  }
-
-  ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"].forEach(function(ev){
-    document.addEventListener(ev, scheduleDim, { passive: true });
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "visible") updateWakeLock();
   });
 
   // ---------- Font scale ----------
@@ -1276,13 +1270,6 @@
 
   document.getElementById("hintBtn").addEventListener("click", useHint);
 
-  dimSwitchEl.addEventListener("click", function(){
-    dimEnabled = !dimEnabled;
-    saveDimPref();
-    dimSwitchEl.classList.toggle("on", dimEnabled);
-    scheduleDim();
-  });
-
   keypadEl.addEventListener("click", function(e){
     var btn = e.target.closest(".key");
     if (!btn) return;
@@ -1313,6 +1300,9 @@
 
   buildBoardDom();
   buildKeypadDom();
+  sizeBoard();
+  window.addEventListener("resize", sizeBoard);
+  window.addEventListener("orientationchange", sizeBoard);
 
   var saved = loadState();
   if (saved){
@@ -1323,10 +1313,7 @@
     newGame("moyen");
   }
   startTimer();
-
-  loadDimPref();
-  dimSwitchEl.classList.toggle("on", dimEnabled);
-  scheduleDim();
+  updateWakeLock();
 
   applyFontScale(loadFontScale());
 
