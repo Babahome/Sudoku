@@ -298,6 +298,17 @@
     padding:1px 6px;
   }
   .action-btn.pencil-on .pill{ background:var(--accent); color:#fff; }
+  .action-btn .lock-pill{
+    position:absolute;
+    top:-4px; right:2px;
+    background:var(--switch-off);
+    border-radius:999px;
+    padding:3px 6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .action-btn .lock-pill svg{ width:10px; height:10px; color:#fff; }
 
   .keypad{
     flex:0 0 auto;
@@ -323,14 +334,6 @@
   .key:disabled{ opacity:0.35; cursor:default; }
   .key:active{ transform:scale(0.96); }
 
-  .hint-text{
-    flex:0 0 auto;
-    text-align:center;
-    color:var(--ink-soft);
-    font-size:0.78rem;
-    margin-top:8px;
-    line-height:1.3;
-  }
 
   .modal-backdrop{
     display:none;
@@ -499,6 +502,7 @@
       </button>
       <button class="action-btn" id="quickPencilBtn">
         <span class="icon" id="quickPencilIcon"></span>
+        <span class="lock-pill" id="lockIcon"></span>
         <span class="label">Crayon rapide</span>
       </button>
       <button class="action-btn" id="pencilBtn">
@@ -514,8 +518,6 @@
     </div>
 
     <div class="keypad" id="keypad"></div>
-
-    <div class="hint-text">La partie est sauvegardée automatiquement. Ferme et reviens quand tu veux, tu retrouveras ta grille.</div>
   </div>
 
   <div class="modal-backdrop" id="settingsModal">
@@ -564,7 +566,8 @@
     undo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>',
     erase:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3l5 5-9.5 9.5H6l-2-2z"></path><path d="M11.5 6.5l5 5"></path><path d="M6 21h13"></path></svg>',
     pencil:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>',
-    bulb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a6 6 0 0 0-4 10.47c.5.46.9 1.15 1 1.83V16h6v-1.7c.1-.68.5-1.37 1-1.83A6 6 0 0 0 12 2z"></path><line x1="19" y1="5" x2="21" y2="3"></line><line x1="20" y1="9" x2="22.5" y2="9"></line></svg>'
+    bulb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a6 6 0 0 0-4 10.47c.5.46.9 1.15 1 1.83V16h6v-1.7c.1-.68.5-1.37 1-1.83A6 6 0 0 0 12 2z"></path><line x1="19" y1="5" x2="21" y2="3"></line><line x1="20" y1="9" x2="22.5" y2="9"></line></svg>',
+    lock:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2"></path></svg>'
   };
 
   document.getElementById("backBtn").innerHTML = ICONS.back;
@@ -577,6 +580,7 @@
   document.getElementById("undoIcon").innerHTML = ICONS.undo;
   document.getElementById("eraseIcon").innerHTML = ICONS.erase;
   document.getElementById("quickPencilIcon").innerHTML = ICONS.pencil;
+  document.getElementById("lockIcon").innerHTML = ICONS.lock;
   document.getElementById("pencilIcon").innerHTML = ICONS.pencil;
   document.getElementById("hintIcon").innerHTML = ICONS.bulb;
 
