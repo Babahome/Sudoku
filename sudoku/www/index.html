@@ -456,6 +456,36 @@
     accent-color:var(--accent);
   }
 
+  .stats-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .stats-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--accent-soft);
+    border-radius:12px;
+    padding:10px 14px;
+  }
+  .stats-row .stats-label{
+    font-size:0.86rem;
+    color:var(--ink);
+  }
+  .stats-row .stats-value{
+    font-size:1.05rem;
+    font-weight:700;
+    color:var(--accent);
+  }
+  .stats-empty{
+    font-size:0.86rem;
+    color:var(--ink-soft);
+    text-align:center;
+    padding:10px 0 16px;
+  }
+
 </style>
 </head>
 <body>
@@ -539,7 +569,16 @@
       </div>
       <button class="modal-btn" id="newGameBtn">Nouvelle partie</button>
       <button class="modal-btn secondary" id="restartBtn">Recommencer la grille</button>
+      <button class="modal-btn secondary" id="statsBtn">Statistiques</button>
       <button class="modal-close" id="closeSettings">Fermer</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="statsModal">
+    <div class="modal">
+      <h2>Statistiques</h2>
+      <div class="stats-list" id="statsList"></div>
+      <button class="modal-close" id="closeStats">Fermer</button>
     </div>
   </div>
 
@@ -982,6 +1021,83 @@
     return true;
   }
 
+  // ---------- Historique des parties et encouragements ----------
+
+  var HISTORY_KEY = "sudoku_maman_history_v1";
+
+  function loadHistory(){
+    try{
+      var raw = JSON.parse(localStorage.getItem(HISTORY_KEY));
+      return Array.isArray(raw) ? raw : [];
+    }catch(e){
+      return [];
+    }
+  }
+
+  function saveHistory(list){
+    try{ localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); }catch(e){ /* stockage indisponible, on continue sans historique */ }
+  }
+
+  function recordGameCompletion(){
+    var now = new Date();
+    var entry = {
+      date: now.toISOString().slice(0, 10),
+      timestamp: now.getTime(),
+      score: state.score,
+      elapsedSeconds: state.elapsedSeconds,
+      difficulty: state.level,
+      errors: state.errors
+    };
+    var history = loadHistory();
+    history.push(entry);
+    if (history.length > 500) history = history.slice(history.length - 500);
+    saveHistory(history);
+    return { entry: entry, history: history };
+  }
+
+  function computeAchievements(entry, history){
+    var monthStr = entry.date.slice(0, 7);
+    var priorToday = history.filter(function(h){ return h.date === entry.date && h.timestamp !== entry.timestamp; });
+    var priorMonth = history.filter(function(h){ return h.date.slice(0, 7) === monthStr && h.timestamp !== entry.timestamp; });
+
+    var messages = [];
+
+    var bestScoreMonth = priorMonth.length && priorMonth.every(function(h){ return entry.score >= h.score; });
+    var bestScoreToday = priorToday.length && priorToday.every(function(h){ return entry.score >= h.score; });
+    if (bestScoreMonth){ messages.push("Meilleur score du mois !"); }
+    else if (bestScoreToday){ messages.push("Meilleur score du jour !"); }
+
+    var bestTimeMonth = priorMonth.length && priorMonth.every(function(h){ return entry.elapsedSeconds <= h.elapsedSeconds; });
+    var bestTimeToday = priorToday.length && priorToday.every(function(h){ return entry.elapsedSeconds <= h.elapsedSeconds; });
+    if (bestTimeMonth){ messages.push("Meilleur temps du mois !"); }
+    else if (bestTimeToday){ messages.push("Meilleur temps du jour !"); }
+
+    return messages;
+  }
+
+  function computeStats(){
+    var history = loadHistory();
+    var wins = history.length;
+    var bestScore = 0, bestTime = 0, avgTime = 0, noErrorWins = 0;
+    if (wins){
+      bestScore = Math.max.apply(null, history.map(function(h){ return h.score; }));
+      bestTime = Math.min.apply(null, history.map(function(h){ return h.elapsedSeconds; }));
+      avgTime = Math.round(history.reduce(function(sum, h){ return sum + h.elapsedSeconds; }, 0) / wins);
+      noErrorWins = history.filter(function(h){ return h.errors === 0; }).length;
+    }
+    return { wins: wins, bestScore: bestScore, bestTime: bestTime, avgTime: avgTime, noErrorWins: noErrorWins };
+  }
+
+  function onGameWon(){
+    state.score += 50;
+    stopTimer();
+    var result = recordGameCompletion();
+    var achievements = computeAchievements(result.entry, result.history);
+    var msg = "Bravo, grille terminee ! Score : " + state.score;
+    if (achievements.length) msg += " " + achievements.join(" ");
+    showToast(msg, achievements.length ? 3200 : 1800);
+  }
+
   function getRowCells(r){ var cells=[]; for (var c=0;c<N;c++) cells.push([r,c]); return cells; }
   function getColCells(c){ var cells=[]; for (var r=0;r<N;r++) cells.push([r,c]); return cells; }
   function getBoxCells(r, c){
@@ -1068,12 +1184,12 @@
     if (idx !== -1) arr.splice(idx, 1);
   }
 
-  function showToast(msg){
+  function showToast(msg, duration){
     var toast = document.getElementById("toast");
     toast.textContent = msg;
     toast.classList.add("show");
     clearTimeout(showToast._t);
-    showToast._t = setTimeout(function(){ toast.classList.remove("show"); }, 1800);
+    showToast._t = setTimeout(function(){ toast.classList.remove("show"); }, duration || 1800);
   }
 
   function inputNumber(num){
@@ -1115,9 +1231,7 @@
       state.score += 10;
       clearNoteFromPeers(r, c, num);
       if (isSolved()){
-        state.score += 50;
-        stopTimer();
-        showToast("Bravo, grille terminee ! Score : " + state.score);
+        onGameWon();
       }
     } else {
       state.errors++;
@@ -1156,9 +1270,7 @@
     state.hints--;
     state.selected = [r,c];
     if (isSolved()){
-      state.score += 50;
-      stopTimer();
-      showToast("Bravo, grille terminee ! Score : " + state.score);
+      onGameWon();
     }
     render();
     checkAndAnimateCompletedUnits(r, c);
@@ -1200,6 +1312,45 @@
 
   function openSettings(){ document.getElementById("settingsModal").classList.add("open"); }
   function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
+
+  function openStats(){
+    renderStats();
+    document.getElementById("statsModal").classList.add("open");
+  }
+  function closeStats(){ document.getElementById("statsModal").classList.remove("open"); }
+
+  function renderStats(){
+    var s = computeStats();
+    var listEl = document.getElementById("statsList");
+    listEl.innerHTML = "";
+    if (!s.wins){
+      var empty = document.createElement("div");
+      empty.className = "stats-empty";
+      empty.textContent = "Termine une grille pour voir tes statistiques !";
+      listEl.appendChild(empty);
+      return;
+    }
+    var rows = [
+      ["Parties gagnees", String(s.wins)],
+      ["Meilleur score", String(s.bestScore)],
+      ["Victoires sans erreur", String(s.noErrorWins)],
+      ["Meilleur temps", formatTime(s.bestTime)],
+      ["Temps moyen", formatTime(s.avgTime)]
+    ];
+    rows.forEach(function(r){
+      var row = document.createElement("div");
+      row.className = "stats-row";
+      var label = document.createElement("span");
+      label.className = "stats-label";
+      label.textContent = r[0];
+      var value = document.createElement("span");
+      value.className = "stats-value";
+      value.textContent = r[1];
+      row.appendChild(label);
+      row.appendChild(value);
+      listEl.appendChild(row);
+    });
+  }
 
   // ---------- Wake lock (garder l'ecran allume pendant la partie) ----------
 
@@ -1277,6 +1428,15 @@
   document.getElementById("closeSettings").addEventListener("click", closeSettings);
   document.getElementById("settingsModal").addEventListener("click", function(e){
     if (e.target === this) closeSettings();
+  });
+
+  document.getElementById("statsBtn").addEventListener("click", function(){
+    closeSettings();
+    openStats();
+  });
+  document.getElementById("closeStats").addEventListener("click", closeStats);
+  document.getElementById("statsModal").addEventListener("click", function(e){
+    if (e.target === this) closeStats();
   });
 
   document.getElementById("backBtn").addEventListener("click", function(){
