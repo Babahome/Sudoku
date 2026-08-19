@@ -190,6 +190,17 @@
   .cell.same-value{ background:#d9e8ff; }
   :root[data-theme="dark"] .cell.same-value{ background:#28345a; }
   .cell.wrong{ color:var(--error); }
+  @keyframes cellSolvedFlash{
+    0%{ background-color:var(--cell); transform:scale(1); }
+    30%{ background-color:var(--success); transform:scale(1.1); }
+    65%{ background-color:var(--success); transform:scale(1.03); }
+    100%{ background-color:var(--cell); transform:scale(1); }
+  }
+  .cell.solved-flash{
+    animation:cellSolvedFlash 600ms ease-out;
+    position:relative;
+    z-index:2;
+  }
   .cell.border-right{ border-right:1px solid var(--line-strong); }
   .cell.border-left{ border-left:1px solid var(--line-strong); }
   .cell.border-bottom{ border-bottom:1px solid var(--line-strong); }
@@ -972,6 +983,54 @@
     return true;
   }
 
+  function getRowCells(r){ var cells=[]; for (var c=0;c<N;c++) cells.push([r,c]); return cells; }
+  function getColCells(c){ var cells=[]; for (var r=0;r<N;r++) cells.push([r,c]); return cells; }
+  function getBoxCells(r, c){
+    var br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+    var cells = [];
+    for (var rr=0;rr<3;rr++){
+      for (var cc=0;cc<3;cc++){ cells.push([br+rr, bc+cc]); }
+    }
+    return cells;
+  }
+
+  function isUnitComplete(cells){
+    return cells.every(function(pos){
+      var r = pos[0], c = pos[1];
+      return state.grid[r][c] !== 0 && state.grid[r][c] === state.solution[r][c];
+    });
+  }
+
+  function animateCells(cellsPositions){
+    var cells = boardEl.children;
+    cellsPositions.forEach(function(pos){
+      var el = cells[pos[0]*N + pos[1]];
+      el.classList.remove("solved-flash");
+      void el.offsetWidth;
+      el.classList.add("solved-flash");
+    });
+    clearTimeout(animateCells._t);
+    animateCells._t = setTimeout(function(){
+      for (var i=0;i<cells.length;i++) cells[i].classList.remove("solved-flash");
+    }, 650);
+  }
+
+  function checkAndAnimateCompletedUnits(r, c){
+    var toAnimate = [];
+    [getRowCells(r), getColCells(c), getBoxCells(r, c)].forEach(function(unitCells){
+      if (isUnitComplete(unitCells)) toAnimate = toAnimate.concat(unitCells);
+    });
+    if (!toAnimate.length) return;
+    var seen = {};
+    var uniqueCells = toAnimate.filter(function(pos){
+      var key = pos[0] + "," + pos[1];
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+    animateCells(uniqueCells);
+  }
+
   function clearNoteFromPeers(row, col, num){
     for (var i=0;i<N;i++){
       removeNote(row, i, num);
@@ -1054,6 +1113,7 @@
     }
 
     render();
+    if (correct) checkAndAnimateCompletedUnits(r, c);
   }
 
   function useHint(){
@@ -1084,6 +1144,7 @@
       showToast("Bravo, grille terminee ! Score : " + state.score);
     }
     render();
+    checkAndAnimateCompletedUnits(r, c);
   }
 
   function quickPencilFill(){
