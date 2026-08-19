@@ -1,4 +1,4 @@
-const CACHE_NAME = "sudoku-maman-v4";
+const CACHE_NAME = "sudoku-maman-v5";
 const CACHED_URLS = ["./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(event){

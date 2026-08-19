@@ -486,6 +486,51 @@
     padding:10px 0 16px;
   }
 
+  .win-modal{ text-align:center; }
+  .win-modal h2{ margin-bottom:10px; }
+  .win-message{
+    font-size:1.02rem;
+    color:var(--ink);
+    line-height:1.45;
+    margin:0 0 14px;
+  }
+  .win-badges{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:6px;
+    margin-bottom:14px;
+  }
+  .win-badge{
+    display:inline-block;
+    background:var(--accent);
+    color:#fff;
+    font-size:0.78rem;
+    font-weight:700;
+    padding:6px 12px;
+    border-radius:999px;
+  }
+  .win-stats{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:18px;
+  }
+  .win-stats .win-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:var(--accent-soft);
+    border-radius:12px;
+    padding:10px 14px;
+    font-size:0.9rem;
+    color:var(--ink);
+  }
+  .win-stats .win-row .win-value{
+    font-weight:700;
+    color:var(--accent);
+  }
+
 </style>
 </head>
 <body>
@@ -579,6 +624,16 @@
       <h2>Statistiques</h2>
       <div class="stats-list" id="statsList"></div>
       <button class="modal-close" id="closeStats">Fermer</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="winModal">
+    <div class="modal win-modal">
+      <h2>Bravo !</h2>
+      <p class="win-message" id="winMessage"></p>
+      <div class="win-badges" id="winBadges"></div>
+      <div class="win-stats" id="winStats"></div>
+      <button class="modal-btn" id="winContinueBtn">Continuer</button>
     </div>
   </div>
 
@@ -1046,13 +1101,43 @@
       score: state.score,
       elapsedSeconds: state.elapsedSeconds,
       difficulty: state.level,
-      errors: state.errors
+      errors: state.errors,
+      hintsUsed: HINTS_PER_GAME - state.hints
     };
     var history = loadHistory();
     history.push(entry);
     if (history.length > 500) history = history.slice(history.length - 500);
     saveHistory(history);
     return { entry: entry, history: history };
+  }
+
+  var WIN_MESSAGES = {
+    noErrors: [
+      "Bravo, pas une seule erreur : quelle bonne methode !",
+      "Zero erreur, quel beau raisonnement !",
+      "Une grille parfaite, sans la moindre erreur !",
+      "Bien joue, une resolution impeccable !"
+    ],
+    noHints: [
+      "Et tout ca sans aucun indice, bravo pour la deduction !",
+      "Resolu sans aide, quelle belle logique !",
+      "Pas un seul indice utilise, bien joue !"
+    ],
+    default: [
+      "Bravo, la grille est terminee !",
+      "Bien joue, tu es venue a bout de cette grille !",
+      "Une grille de plus resolue, felicitations !"
+    ]
+  };
+
+  function pickRandom(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function buildWinMessage(entry){
+    var lines = [];
+    if (entry.errors === 0) lines.push(pickRandom(WIN_MESSAGES.noErrors));
+    if (entry.hintsUsed === 0) lines.push(pickRandom(WIN_MESSAGES.noHints));
+    if (!lines.length) lines.push(pickRandom(WIN_MESSAGES.default));
+    return lines.join(" ");
   }
 
   function computeAchievements(entry, history){
@@ -1090,12 +1175,44 @@
 
   function onGameWon(){
     state.score += 50;
+    state.locked = true;
     stopTimer();
     var result = recordGameCompletion();
     var achievements = computeAchievements(result.entry, result.history);
-    var msg = "Bravo, grille terminee ! Score : " + state.score;
-    if (achievements.length) msg += " " + achievements.join(" ");
-    showToast(msg, achievements.length ? 3200 : 1800);
+    showWinModal(result.entry, achievements);
+  }
+
+  function addStatRow(container, label, value){
+    var row = document.createElement("div");
+    row.className = "win-row";
+    var l = document.createElement("span");
+    l.textContent = label;
+    var v = document.createElement("span");
+    v.className = "win-value";
+    v.textContent = value;
+    row.appendChild(l);
+    row.appendChild(v);
+    container.appendChild(row);
+  }
+
+  function showWinModal(entry, achievements){
+    document.getElementById("winMessage").textContent = buildWinMessage(entry);
+
+    var statsEl = document.getElementById("winStats");
+    statsEl.innerHTML = "";
+    addStatRow(statsEl, "Score", String(entry.score));
+    addStatRow(statsEl, "Temps", formatTime(entry.elapsedSeconds));
+
+    var badgesEl = document.getElementById("winBadges");
+    badgesEl.innerHTML = "";
+    achievements.forEach(function(msg){
+      var badge = document.createElement("span");
+      badge.className = "win-badge";
+      badge.textContent = msg;
+      badgesEl.appendChild(badge);
+    });
+
+    document.getElementById("winModal").classList.add("open");
   }
 
   function getRowCells(r){ var cells=[]; for (var c=0;c<N;c++) cells.push([r,c]); return cells; }
@@ -1437,6 +1554,10 @@
   document.getElementById("closeStats").addEventListener("click", closeStats);
   document.getElementById("statsModal").addEventListener("click", function(e){
     if (e.target === this) closeStats();
+  });
+
+  document.getElementById("winContinueBtn").addEventListener("click", function(){
+    document.getElementById("winModal").classList.remove("open");
   });
 
   document.getElementById("backBtn").addEventListener("click", function(){
