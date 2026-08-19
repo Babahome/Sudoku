@@ -219,15 +219,15 @@
   }
   .board-wrap.paused .board-overlay{ display:flex; }
 
-  .toggle-row{
+  .top-toggle-row{
     flex:0 0 auto;
     display:flex;
     align-items:center;
-    justify-content:flex-end;
+    justify-content:flex-start;
     gap:8px;
-    margin:6px 2px 10px;
+    margin:0 2px 8px;
   }
-  .toggle-row svg{ width:16px; height:16px; color:var(--ink-soft); }
+  .top-toggle-row svg{ width:16px; height:16px; color:var(--ink-soft); }
   .switch{
     width:40px; height:22px;
     background:var(--switch-off);
@@ -314,23 +314,23 @@
     flex:0 0 auto;
     display:grid;
     grid-template-columns:repeat(9,1fr);
-    gap:6px;
+    gap:8px;
   }
   .key{
     background:var(--cell);
     color:var(--accent);
     border:1px solid var(--line-soft);
     border-radius:10px;
-    font-size:1.3rem;
+    font-size:1.55rem;
     font-weight:700;
-    padding:10px 0 6px;
+    padding:14px 0 8px;
     cursor:pointer;
     display:flex;
     flex-direction:column;
     align-items:center;
     line-height:1.1;
   }
-  .key .count{ font-size:0.62rem; font-weight:600; color:var(--ink-soft); }
+  .key .count{ font-size:0.68rem; font-weight:600; color:var(--ink-soft); }
   .key:disabled{ opacity:0.35; cursor:default; }
   .key:active{ transform:scale(0.96); }
 
@@ -421,18 +421,9 @@
 
   @media (max-width:380px){
     .action-btn .label{ font-size:0.65rem; }
-    .key{ font-size:1.05rem; }
+    .key{ font-size:1.25rem; }
   }
 
-  .modal-toggle-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin:0 0 16px;
-    font-size:0.92rem;
-    color:var(--ink);
-  }
   .modal-slider-row{
     margin:0 0 16px;
     font-size:0.92rem;
@@ -468,6 +459,11 @@
       </div>
     </div>
 
+    <div class="top-toggle-row">
+      <span id="toggleIcon"></span>
+      <button class="switch" id="highlightSwitch"><span class="knob"></span></button>
+    </div>
+
     <div class="score-row">
       <span class="label">Score : <span id="scoreVal">0</span></span>
     </div>
@@ -484,11 +480,6 @@
     <div class="board-wrap" id="boardWrap">
       <div class="board" id="board"></div>
       <div class="board-overlay" id="boardOverlay">Reprendre &#9654;</div>
-    </div>
-
-    <div class="toggle-row">
-      <span id="toggleIcon"></span>
-      <button class="switch" id="highlightSwitch"><span class="knob"></span></button>
     </div>
 
     <div class="actions-row">
