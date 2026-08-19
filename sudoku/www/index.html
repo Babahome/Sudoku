@@ -191,13 +191,12 @@
   :root[data-theme="dark"] .cell.same-value{ background:#28345a; }
   .cell.wrong{ color:var(--error); }
   @keyframes cellSolvedFlash{
-    0%{ background-color:var(--cell); transform:scale(1); }
-    30%{ background-color:var(--success); transform:scale(1.1); }
-    65%{ background-color:var(--success); transform:scale(1.03); }
-    100%{ background-color:var(--cell); transform:scale(1); }
+    0%{ background-color:var(--cell); transform:scale(1) translateY(0); }
+    35%{ background-color:var(--accent); transform:scale(1.12) translateY(-2px); }
+    100%{ background-color:var(--cell); transform:scale(1) translateY(0); }
   }
   .cell.solved-flash{
-    animation:cellSolvedFlash 600ms ease-out;
+    animation:cellSolvedFlash 420ms ease-out both;
     position:relative;
     z-index:2;
   }
@@ -1001,34 +1000,52 @@
     });
   }
 
-  function animateCells(cellsPositions){
+  function animateCells(scheduled){
     var cells = boardEl.children;
-    cellsPositions.forEach(function(pos){
-      var el = cells[pos[0]*N + pos[1]];
+    var maxDelay = 0;
+    scheduled.forEach(function(item){
+      var el = cells[item.pos[0]*N + item.pos[1]];
       el.classList.remove("solved-flash");
+      el.style.animationDelay = "0ms";
       void el.offsetWidth;
+      el.style.animationDelay = item.delay + "ms";
       el.classList.add("solved-flash");
+      if (item.delay > maxDelay) maxDelay = item.delay;
     });
     clearTimeout(animateCells._t);
     animateCells._t = setTimeout(function(){
-      for (var i=0;i<cells.length;i++) cells[i].classList.remove("solved-flash");
-    }, 650);
+      scheduled.forEach(function(item){
+        var el = cells[item.pos[0]*N + item.pos[1]];
+        el.classList.remove("solved-flash");
+        el.style.animationDelay = "";
+      });
+    }, maxDelay + 450);
   }
 
   function checkAndAnimateCompletedUnits(r, c){
-    var toAnimate = [];
-    [getRowCells(r), getColCells(c), getBoxCells(r, c)].forEach(function(unitCells){
-      if (isUnitComplete(unitCells)) toAnimate = toAnimate.concat(unitCells);
-    });
-    if (!toAnimate.length) return;
+    var units = [];
+    var rowCells = getRowCells(r);
+    if (isUnitComplete(rowCells)) units.push({ type: "row", cells: rowCells });
+    var colCells = getColCells(c);
+    if (isUnitComplete(colCells)) units.push({ type: "col", cells: colCells });
+    var boxCells = getBoxCells(r, c);
+    if (isUnitComplete(boxCells)) units.push({ type: "box", cells: boxCells });
+    if (!units.length) return;
+
     var seen = {};
-    var uniqueCells = toAnimate.filter(function(pos){
-      var key = pos[0] + "," + pos[1];
-      if (seen[key]) return false;
-      seen[key] = true;
-      return true;
+    var scheduled = [];
+    units.forEach(function(unit){
+      unit.cells.forEach(function(pos, idx){
+        var key = pos[0] + "," + pos[1];
+        if (seen[key]) return;
+        seen[key] = true;
+        var delay = unit.type === "row" ? pos[1] * 55
+          : unit.type === "col" ? pos[0] * 55
+          : idx * 45;
+        scheduled.push({ pos: pos, delay: delay });
+      });
     });
-    animateCells(uniqueCells);
+    animateCells(scheduled);
   }
 
   function clearNoteFromPeers(row, col, num){
