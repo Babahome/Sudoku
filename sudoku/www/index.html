@@ -104,9 +104,20 @@
 
   .score-row{
     flex:0 0 auto;
+    position:relative;
     text-align:center;
     margin-bottom:6px;
   }
+  .top-toggle{
+    position:absolute;
+    left:2px;
+    top:50%;
+    transform:translateY(-50%);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .top-toggle svg{ width:16px; height:16px; color:var(--ink-soft); }
   .score-row .label{
     font-size:1.3rem;
     font-weight:700;
@@ -219,15 +230,6 @@
   }
   .board-wrap.paused .board-overlay{ display:flex; }
 
-  .top-toggle-row{
-    flex:0 0 auto;
-    display:flex;
-    align-items:center;
-    justify-content:flex-start;
-    gap:8px;
-    margin:0 2px 8px;
-  }
-  .top-toggle-row svg{ width:16px; height:16px; color:var(--ink-soft); }
   .switch{
     width:40px; height:22px;
     background:var(--switch-off);
@@ -254,7 +256,7 @@
     display:grid;
     grid-template-columns:repeat(5,1fr);
     gap:4px;
-    margin-bottom:10px;
+    margin:14px 0 10px;
   }
   .action-btn{
     background:none;
@@ -459,12 +461,11 @@
       </div>
     </div>
 
-    <div class="top-toggle-row">
-      <span id="toggleIcon"></span>
-      <button class="switch" id="highlightSwitch"><span class="knob"></span></button>
-    </div>
-
     <div class="score-row">
+      <span class="top-toggle">
+        <span id="toggleIcon"></span>
+        <button class="switch" id="highlightSwitch"><span class="knob"></span></button>
+      </span>
       <span class="label">Score : <span id="scoreVal">0</span></span>
     </div>
 
