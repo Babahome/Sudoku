@@ -633,7 +633,7 @@
       <p class="win-message" id="winMessage"></p>
       <div class="win-badges" id="winBadges"></div>
       <div class="win-stats" id="winStats"></div>
-      <button class="modal-btn" id="winContinueBtn">Continuer</button>
+      <button class="modal-btn" id="winNewGameBtn">Nouvelle partie</button>
     </div>
   </div>
 
@@ -855,6 +855,7 @@
     };
     undoStack = [];
     closeSettings();
+    document.getElementById("winModal").classList.remove("open");
     saveState();
     render();
   }
@@ -1556,8 +1557,9 @@
     if (e.target === this) closeStats();
   });
 
-  document.getElementById("winContinueBtn").addEventListener("click", function(){
-    document.getElementById("winModal").classList.remove("open");
+  document.getElementById("winNewGameBtn").addEventListener("click", function(){
+    var level = state ? state.level : "moyen";
+    newGame(level);
   });
 
   document.getElementById("backBtn").addEventListener("click", function(){

@@ -1,6 +1,6 @@
 name: "Sudoku"
 description: "Jeu de Sudoku simple et agreable a jouer"
-version: "0.5.1"
+version: "0.5.2"
 slug: "sudoku"
 init: false
 arch:
