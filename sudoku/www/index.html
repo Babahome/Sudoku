@@ -200,6 +200,8 @@
     position:relative;
     z-index:2;
   }
+  .cell.hint-zone{ background:var(--accent-soft); }
+  .cell.hint-target{ box-shadow:inset 0 0 0 3px var(--accent); z-index:1; }
   .cell.border-right{ border-right:1px solid var(--line-strong); }
   .cell.border-left{ border-left:1px solid var(--line-strong); }
   .cell.border-bottom{ border-bottom:1px solid var(--line-strong); }
@@ -531,6 +533,49 @@
     color:var(--accent);
   }
 
+  .hint-panel{
+    position:fixed;
+    left:50%;
+    bottom:0;
+    transform:translate(-50%, 110%);
+    width:100%;
+    max-width:520px;
+    background:var(--cell);
+    border-radius:20px 20px 0 0;
+    padding:16px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+    box-shadow:0 -6px 24px rgba(0,0,0,0.18);
+    z-index:25;
+    transition:transform .25s ease;
+  }
+  .hint-panel.open{ transform:translate(-50%, 0); }
+  .hint-panel-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .hint-panel-title{
+    font-size:1.02rem;
+    font-weight:700;
+    color:var(--accent);
+  }
+  .hint-panel-close{
+    background:none;
+    border:none;
+    font-size:1.3rem;
+    line-height:1;
+    color:var(--ink-soft);
+    cursor:pointer;
+    padding:2px 8px;
+  }
+  .hint-panel-body{
+    font-size:0.9rem;
+    color:var(--ink);
+    line-height:1.45;
+    margin:0 0 16px;
+    min-height:2.6em;
+  }
+
 </style>
 </head>
 <body>
@@ -635,6 +680,15 @@
       <div class="win-stats" id="winStats"></div>
       <button class="modal-btn" id="winNewGameBtn">Nouvelle partie</button>
     </div>
+  </div>
+
+  <div class="hint-panel" id="hintPanel">
+    <div class="hint-panel-header">
+      <span class="hint-panel-title" id="hintTitle"></span>
+      <button class="hint-panel-close" id="hintCloseBtn" title="Fermer">&times;</button>
+    </div>
+    <p class="hint-panel-body" id="hintBody"></p>
+    <button class="modal-btn" id="hintNextBtn">Suivant</button>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -856,6 +910,9 @@
     undoStack = [];
     closeSettings();
     document.getElementById("winModal").classList.remove("open");
+    hintSession = null;
+    clearHintHighlight();
+    document.getElementById("hintPanel").classList.remove("open");
     saveState();
     render();
   }
@@ -878,6 +935,9 @@
     state.locked = false;
     undoStack = [];
     closeSettings();
+    hintSession = null;
+    clearHintHighlight();
+    document.getElementById("hintPanel").classList.remove("open");
     saveState();
     render();
   }
@@ -1050,6 +1110,11 @@
 
         var isSameValue = highlightOn && !isSelected && selVal !== 0 && val === selVal;
         cellEl.classList.toggle("same-value", isSameValue);
+
+        var isHintZone = !!(hintHighlightZone && hintHighlightZone.some(function(p){ return p[0] === r && p[1] === c; }));
+        cellEl.classList.toggle("hint-zone", isHintZone);
+        var isHintTarget = !!(hintHighlightTarget && hintHighlightTarget[0] === r && hintHighlightTarget[1] === c);
+        cellEl.classList.toggle("hint-target", isHintTarget);
       }
     }
 
@@ -1234,6 +1299,253 @@
     });
   }
 
+  // ---------- Moteur de detection de techniques (indice progressif) ----------
+
+  var UNIT_LABEL = { row: "la ligne", col: "la colonne", box: "le carre" };
+  var UNIT_LABEL_DE = { row: "de la ligne", col: "de la colonne", box: "du carre" };
+
+  function unitsList(){
+    var units = [];
+    for (var r=0;r<N;r++){ units.push({ type: "row", index: r, cells: getRowCells(r) }); }
+    for (var c=0;c<N;c++){ units.push({ type: "col", index: c, cells: getColCells(c) }); }
+    for (var br=0;br<3;br++){
+      for (var bc=0;bc<3;bc++){
+        units.push({ type: "box", index: br*3+bc, cells: getBoxCells(br*3, bc*3) });
+      }
+    }
+    return units;
+  }
+
+  function computeCandidates(){
+    var cand = [];
+    for (var r=0;r<N;r++){
+      var row = [];
+      for (var c=0;c<N;c++){
+        if (state.grid[r][c] !== 0){ row.push([]); continue; }
+        var used = {};
+        for (var i=0;i<N;i++){
+          if (state.grid[r][i]) used[state.grid[r][i]] = true;
+          if (state.grid[i][c]) used[state.grid[i][c]] = true;
+        }
+        var br = Math.floor(r/3)*3, bc = Math.floor(c/3)*3;
+        for (var rr=0;rr<3;rr++){
+          for (var cc=0;cc<3;cc++){
+            var v = state.grid[br+rr][bc+cc];
+            if (v) used[v] = true;
+          }
+        }
+        var opts = [];
+        for (var n=1;n<=9;n++){ if (!used[n]) opts.push(n); }
+        row.push(opts);
+      }
+      cand.push(row);
+    }
+    return cand;
+  }
+
+  function cloneCandidates(cand){
+    return cand.map(function(row){ return row.map(function(c){ return c.slice(); }); });
+  }
+
+  function posKey(pos){ return pos[0]*N + pos[1]; }
+
+  function toKeySet(cells){
+    var set = {};
+    cells.forEach(function(pos){ set[posKey(pos)] = true; });
+    return set;
+  }
+
+  function cellsNotInSet(cells, keySet){
+    return cells.filter(function(pos){ return !keySet[posKey(pos)]; });
+  }
+
+  function uniqueNums(arr){
+    var seen = {}, out = [];
+    arr.forEach(function(v){ if (!seen[v]){ seen[v] = true; out.push(v); } });
+    return out;
+  }
+
+  function candidateCellsForValue(cand, cells, v){
+    return cells.filter(function(pos){
+      return state.grid[pos[0]][pos[1]] === 0 && cand[pos[0]][pos[1]].indexOf(v) !== -1;
+    });
+  }
+
+  function eliminateValuesAndFindSingle(cand, values, cellsToClear){
+    var cand2 = cloneCandidates(cand);
+    var changed = false;
+    cellsToClear.forEach(function(pos){
+      values.forEach(function(v){
+        var idx = cand2[pos[0]][pos[1]].indexOf(v);
+        if (idx !== -1){ cand2[pos[0]][pos[1]].splice(idx, 1); changed = true; }
+      });
+    });
+    if (!changed) return null;
+    return findNakedSingle(cand2) || findHiddenSingle(cand2);
+  }
+
+  function findNakedSingle(cand){
+    for (var r=0;r<N;r++){
+      for (var c=0;c<N;c++){
+        if (state.grid[r][c] === 0 && cand[r][c].length === 1){
+          var v = cand[r][c][0];
+          return {
+            technique: "naked-single",
+            name: "Single nu",
+            row: r, col: c, value: v,
+            zoneCells: [[r, c]],
+            explain: "La case ligne " + (r+1) + ", colonne " + (c+1) + " ne peut recevoir que le chiffre " + v + " : c'est la seule valeur encore possible, toutes les autres etant deja utilisees dans sa ligne, sa colonne ou son carre."
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  function findHiddenSingle(cand){
+    var units = unitsList();
+    for (var u=0;u<units.length;u++){
+      var unit = units[u];
+      for (var v=1; v<=9; v++){
+        var spots = candidateCellsForValue(cand, unit.cells, v);
+        if (spots.length === 1){
+          var pos = spots[0];
+          return {
+            technique: "hidden-single",
+            name: "Single cache",
+            row: pos[0], col: pos[1], value: v,
+            zoneCells: unit.cells,
+            explain: "Dans " + UNIT_LABEL[unit.type] + " " + (unit.type === "box" ? "concerne" : "concernee") + ", le chiffre " + v + " ne peut se placer que dans une seule case (ligne " + (pos[0]+1) + ", colonne " + (pos[1]+1) + "), meme si cette case semble avoir d'autres possibilites a premiere vue."
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  function buildLockedCandidateHint(kind, unitLabel, unitIndex, v, sourceCells, clearedCells, result){
+    var kindLabel = kind === "pointing" ? "Paire/triplet pointe" : "Reduction ligne-carre";
+    var explain = kind === "pointing"
+      ? "Dans ce carre, le chiffre " + v + " ne peut se trouver que sur la " + unitLabel + " " + (unitIndex+1) + ". On peut donc l'eliminer des autres cases de cette " + unitLabel + " en dehors du carre."
+      : "Dans cette " + unitLabel + ", le chiffre " + v + " ne peut se trouver que dans un seul carre. On peut donc l'eliminer des autres cases de ce carre en dehors de la " + unitLabel + " " + (unitIndex+1) + ".";
+    return {
+      technique: "locked-candidate",
+      name: kindLabel,
+      row: result.row, col: result.col, value: result.value,
+      zoneCells: sourceCells.concat(clearedCells),
+      explain: explain + " Cette elimination revele alors que la case ligne " + (result.row+1) + ", colonne " + (result.col+1) + " ne peut plus recevoir que " + result.value + "."
+    };
+  }
+
+  function findLockedCandidate(cand){
+    for (var br=0; br<3; br++){
+      for (var bc=0; bc<3; bc++){
+        var boxCells = getBoxCells(br*3, bc*3);
+        for (var v=1; v<=9; v++){
+          var spots = candidateCellsForValue(cand, boxCells, v);
+          if (spots.length < 2) continue;
+          var rows = uniqueNums(spots.map(function(p){ return p[0]; }));
+          var cols = uniqueNums(spots.map(function(p){ return p[1]; }));
+          if (rows.length === 1){
+            var outsideRow = cellsNotInSet(getRowCells(rows[0]), toKeySet(boxCells));
+            var toClearRow = candidateCellsForValue(cand, outsideRow, v);
+            if (toClearRow.length){
+              var resultRow = eliminateValuesAndFindSingle(cand, [v], toClearRow);
+              if (resultRow) return buildLockedCandidateHint("pointing", "ligne", rows[0], v, spots, toClearRow, resultRow);
+            }
+          }
+          if (cols.length === 1){
+            var outsideCol = cellsNotInSet(getColCells(cols[0]), toKeySet(boxCells));
+            var toClearCol = candidateCellsForValue(cand, outsideCol, v);
+            if (toClearCol.length){
+              var resultCol = eliminateValuesAndFindSingle(cand, [v], toClearCol);
+              if (resultCol) return buildLockedCandidateHint("pointing", "colonne", cols[0], v, spots, toClearCol, resultCol);
+            }
+          }
+        }
+      }
+    }
+
+    for (var r=0;r<N;r++){
+      var rowCells = getRowCells(r);
+      for (var v2=1; v2<=9; v2++){
+        var spotsR = candidateCellsForValue(cand, rowCells, v2);
+        if (spotsR.length < 2) continue;
+        var boxesR = uniqueNums(spotsR.map(function(p){ return Math.floor(p[0]/3)*3 + Math.floor(p[1]/3); }));
+        if (boxesR.length === 1){
+          var boxRR = Math.floor(boxesR[0]/3)*3, boxRC = (boxesR[0]%3)*3;
+          var outsideBoxR = cellsNotInSet(getBoxCells(boxRR, boxRC), toKeySet(rowCells));
+          var toClearBoxR = candidateCellsForValue(cand, outsideBoxR, v2);
+          if (toClearBoxR.length){
+            var resultBoxR = eliminateValuesAndFindSingle(cand, [v2], toClearBoxR);
+            if (resultBoxR) return buildLockedCandidateHint("claiming", "ligne", r, v2, spotsR, toClearBoxR, resultBoxR);
+          }
+        }
+      }
+    }
+
+    for (var c2=0;c2<N;c2++){
+      var colCells = getColCells(c2);
+      for (var v3=1; v3<=9; v3++){
+        var spotsC = candidateCellsForValue(cand, colCells, v3);
+        if (spotsC.length < 2) continue;
+        var boxesC = uniqueNums(spotsC.map(function(p){ return Math.floor(p[0]/3)*3 + Math.floor(p[1]/3); }));
+        if (boxesC.length === 1){
+          var boxCR = Math.floor(boxesC[0]/3)*3, boxCC = (boxesC[0]%3)*3;
+          var outsideBoxC = cellsNotInSet(getBoxCells(boxCR, boxCC), toKeySet(colCells));
+          var toClearBoxC = candidateCellsForValue(cand, outsideBoxC, v3);
+          if (toClearBoxC.length){
+            var resultBoxC = eliminateValuesAndFindSingle(cand, [v3], toClearBoxC);
+            if (resultBoxC) return buildLockedCandidateHint("claiming", "colonne", c2, v3, spotsC, toClearBoxC, resultBoxC);
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function findNakedPair(cand){
+    var units = unitsList();
+    for (var u=0;u<units.length;u++){
+      var unit = units[u];
+      var pairCells = unit.cells.filter(function(pos){
+        return state.grid[pos[0]][pos[1]] === 0 && cand[pos[0]][pos[1]].length === 2;
+      });
+      for (var i=0;i<pairCells.length;i++){
+        for (var j=i+1;j<pairCells.length;j++){
+          var a = cand[pairCells[i][0]][pairCells[i][1]];
+          var b = cand[pairCells[j][0]][pairCells[j][1]];
+          if (a[0] === b[0] && a[1] === b[1]){
+            var keySet = toKeySet([pairCells[i], pairCells[j]]);
+            var others = cellsNotInSet(unit.cells, keySet);
+            var toClear = others.filter(function(pos){
+              return state.grid[pos[0]][pos[1]] === 0 &&
+                (cand[pos[0]][pos[1]].indexOf(a[0]) !== -1 || cand[pos[0]][pos[1]].indexOf(a[1]) !== -1);
+            });
+            if (!toClear.length) continue;
+            var result = eliminateValuesAndFindSingle(cand, a, toClear);
+            if (result){
+              return {
+                technique: "naked-pair",
+                name: "Paire nue",
+                row: result.row, col: result.col, value: result.value,
+                zoneCells: [pairCells[i], pairCells[j]].concat(toClear),
+                explain: "Les cases ligne " + (pairCells[i][0]+1) + " colonne " + (pairCells[i][1]+1) + " et ligne " + (pairCells[j][0]+1) + " colonne " + (pairCells[j][1]+1) + " ne peuvent contenir que " + a[0] + " et " + a[1] + ". On peut donc eliminer ces deux chiffres des autres cases " + UNIT_LABEL_DE[unit.type] + ". Cela revele que la case ligne " + (result.row+1) + ", colonne " + (result.col+1) + " ne peut plus recevoir que " + result.value + "."
+              };
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function findHint(){
+    var cand = computeCandidates();
+    return findNakedSingle(cand) || findHiddenSingle(cand) || findLockedCandidate(cand) || findNakedPair(cand) || null;
+  }
+
   function animateCells(scheduled){
     var cells = boardEl.children;
     var maxDelay = 0;
@@ -1365,8 +1677,37 @@
     if (correct) checkAndAnimateCompletedUnits(r, c);
   }
 
-  function useHint(){
-    if (!state || state.hints <= 0 || state.locked || state.paused) return;
+  // ---------- Indice progressif (4 etapes) ----------
+
+  var hintSession = null;
+  var hintHighlightZone = null;
+  var hintHighlightTarget = null;
+
+  function setHintHighlight(zoneCells, target){
+    hintHighlightZone = zoneCells;
+    hintHighlightTarget = target;
+  }
+
+  function clearHintHighlight(){
+    hintHighlightZone = null;
+    hintHighlightTarget = null;
+  }
+
+  function applyHintTarget(r, c, value){
+    pushUndo();
+    state.grid[r][c] = value;
+    state.notes[r][c] = [];
+    clearNoteFromPeers(r, c, value);
+    state.hints--;
+    state.selected = [r, c];
+    if (isSolved()){
+      onGameWon();
+    }
+    render();
+    checkAndAnimateCompletedUnits(r, c);
+  }
+
+  function applyClassicHint(){
     var target = state.selected;
     if (!target || state.given[target[0]][target[1]] || state.grid[target[0]][target[1]] === state.solution[target[0]][target[1]]){
       var candidates = [];
@@ -1380,18 +1721,64 @@
       if (!candidates.length) return;
       target = candidates[Math.floor(Math.random()*candidates.length)];
     }
-    pushUndo();
-    var r = target[0], c = target[1];
-    state.grid[r][c] = state.solution[r][c];
-    state.notes[r][c] = [];
-    clearNoteFromPeers(r, c, state.solution[r][c]);
-    state.hints--;
-    state.selected = [r,c];
-    if (isSolved()){
-      onGameWon();
+    applyHintTarget(target[0], target[1], state.solution[target[0]][target[1]]);
+  }
+
+  function closeHintPanel(){
+    hintSession = null;
+    clearHintHighlight();
+    document.getElementById("hintPanel").classList.remove("open");
+    render();
+  }
+
+  function renderHintPanel(){
+    if (!hintSession) return;
+    var data = hintSession.data;
+    var titleEl = document.getElementById("hintTitle");
+    var bodyEl = document.getElementById("hintBody");
+    var nextBtn = document.getElementById("hintNextBtn");
+
+    if (hintSession.step === 1){
+      titleEl.textContent = data.name;
+      bodyEl.textContent = "Une technique de resolution s'applique quelque part sur la grille.";
+      nextBtn.textContent = "Voir la zone";
+      clearHintHighlight();
+    } else if (hintSession.step === 2){
+      titleEl.textContent = data.name;
+      bodyEl.textContent = "Regarde la zone en surbrillance sur la grille.";
+      nextBtn.textContent = "Comprendre pourquoi";
+      setHintHighlight(data.zoneCells, [data.row, data.col]);
+    } else {
+      titleEl.textContent = data.name;
+      bodyEl.textContent = data.explain;
+      nextBtn.textContent = "Remplir la case";
+      setHintHighlight(data.zoneCells, [data.row, data.col]);
     }
     render();
-    checkAndAnimateCompletedUnits(r, c);
+  }
+
+  function startHintFlow(){
+    if (!state || state.hints <= 0 || state.locked || state.paused) return;
+    var found = findHint();
+    if (!found){
+      applyClassicHint();
+      return;
+    }
+    hintSession = { step: 1, data: found };
+    renderHintPanel();
+    document.getElementById("hintPanel").classList.add("open");
+  }
+
+  function advanceHint(){
+    if (!hintSession) return;
+    if (hintSession.step < 3){
+      hintSession.step++;
+      renderHintPanel();
+    } else {
+      var data = hintSession.data;
+      closeHintPanel();
+      applyHintTarget(data.row, data.col, data.value);
+    }
   }
 
   function quickPencilFill(){
@@ -1625,7 +2012,9 @@
     render();
   });
 
-  document.getElementById("hintBtn").addEventListener("click", useHint);
+  document.getElementById("hintBtn").addEventListener("click", startHintFlow);
+  document.getElementById("hintNextBtn").addEventListener("click", advanceHint);
+  document.getElementById("hintCloseBtn").addEventListener("click", closeHintPanel);
 
   keypadEl.addEventListener("click", function(e){
     var btn = e.target.closest(".key");
